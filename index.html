@@ -480,17 +480,18 @@ select.form-control option{background:#1a1a1a;color:var(--text)}
     <!-- LOGIN -->
     <div id="auth-login">
       <div class="form-group">
-        <label class="form-label">Email</label>
-        <input class="form-control" type="email" id="login-email" placeholder="seu@email.com" onkeydown="if(event.key==='Enter')doLogin()">
+        <label class="form-label">Login (Apelido)</label>
+        <input class="form-control" id="login-nick" placeholder="Ex: Mexicano" autocomplete="off" autocapitalize="off" spellcheck="false" onkeydown="if(event.key==='Enter')doLogin()">
       </div>
       <div class="form-group">
         <label class="form-label">Senha</label>
-        <input class="form-control" type="password" id="login-pass" placeholder="••••••••" onkeydown="if(event.key==='Enter')doLogin()">
+        <div style="position:relative">
+          <input class="form-control" type="password" id="login-pass" placeholder="••••••••" style="padding-right:44px" onkeydown="if(event.key==='Enter')doLogin()">
+          <button type="button" onclick="togglePassVis('login-pass',this)" style="position:absolute;right:0;top:0;bottom:0;width:42px;background:none;border:none;cursor:pointer;color:var(--muted);font-size:1.1rem;display:flex;align-items:center;justify-content:center;border-radius:0 8px 8px 0;transition:color .2s" onmouseover="this.style.color='var(--text)'" onmouseout="this.style.color='var(--muted)'">👁</button>
+        </div>
       </div>
       <button class="btn btn-primary btn-full" style="margin-top:.5rem" onclick="doLogin()">⚡ ENTRAR NO CAMPO</button>
-      <div class="auth-divider">conta demo</div>
-      <button class="btn btn-gray btn-full btn-sm" onclick="demoLogin()">🎮 ENTRAR COMO MEXICANO (DEMO)</button>
-    </div>
+    </div>    </div>
 
     <!-- REGISTER -->
     <div id="auth-register" style="display:none">
@@ -890,6 +891,37 @@ select.form-control option{background:#1a1a1a;color:var(--text)}
   </div>
 </div>
 
+
+<!-- First Access Modal -->
+<div id="modal-first-access" class="modal-overlay">
+  <div class="modal" style="max-width:420px">
+    <div class="modal-title">🔐 PRIMEIRO ACESSO</div>
+    <div style="font-size:.9rem;color:var(--muted);margin-bottom:1.5rem;line-height:1.5">
+      Bem-vindo ao <strong style="color:var(--green)">TocaProPai</strong>! 🎉<br>
+      Crie uma senha pessoal para proteger sua conta.<br>
+      <span style="font-style:italic;font-size:.8rem">Pode pular agora e trocar depois no perfil.</span>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Nova Senha</label>
+      <div style="position:relative">
+        <input class="form-control" type="password" id="fa-pass1" placeholder="Mínimo 4 caracteres" style="padding-right:44px" onkeydown="if(event.key==='Enter')saveFirstAccessPassword()">
+        <button type="button" onclick="togglePassVis('fa-pass1',this)" style="position:absolute;right:0;top:0;bottom:0;width:42px;background:none;border:none;cursor:pointer;color:var(--muted);font-size:1.1rem;display:flex;align-items:center;justify-content:center;border-radius:0 8px 8px 0">👁</button>
+      </div>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Confirmar Senha</label>
+      <div style="position:relative">
+        <input class="form-control" type="password" id="fa-pass2" placeholder="Repita a senha" style="padding-right:44px" onkeydown="if(event.key==='Enter')saveFirstAccessPassword()">
+        <button type="button" onclick="togglePassVis('fa-pass2',this)" style="position:absolute;right:0;top:0;bottom:0;width:42px;background:none;border:none;cursor:pointer;color:var(--muted);font-size:1.1rem;display:flex;align-items:center;justify-content:center;border-radius:0 8px 8px 0">👁</button>
+      </div>
+    </div>
+    <div style="display:flex;gap:8px;margin-top:.5rem">
+      <button class="btn btn-primary" style="flex:1" onclick="saveFirstAccessPassword()">💾 SALVAR SENHA</button>
+      <button class="btn btn-gray btn-sm" onclick="skipFirstAccess()">Pular</button>
+    </div>
+  </div>
+</div>
+
 <div class="toast" id="toast"></div>
 
 <!-- ═══════════════════════ SCRIPTS ═══════════════════════ -->
@@ -1096,21 +1128,20 @@ function switchAuthTab(tab){
 }
 
 function doLogin(){
-  const email=document.getElementById('login-email').value.trim();
+  const nick=document.getElementById('login-nick').value.trim().toLowerCase();
   const pass=document.getElementById('login-pass').value;
-  if(!email||!pass){toast('Preencha email e senha, va na fé!','error');return}
-  const user=S.users.find(u=>u.email===email&&u.pass===pass);
-  if(!user){toast('Email ou senha errados! Vai roubar em outro campo 😅','error');return}
+  if(!nick||!pass){toast('Preencha apelido e senha, vai na fé! ⚽','error');return}
+  const user=S.users.find(u=>u.nick.toLowerCase()===nick&&u.pass===pass);
+  if(!user){toast('Apelido ou senha errados! Vai roubar em outro campo 😅','error');return}
   loginUser(user);
 }
 
 function demoLogin(){
-  let users=S.users;
-  const demo=users.find(u=>u.email==='wm.mexicano@gmail.com');
-  if(demo){loginUser(demo);return}
-  toast('Conta demo não encontrada. Criando dados...','info');
   seedDemoData();
-  setTimeout(()=>{const d=S.users.find(u=>u.email==='demo@fut7.com');if(d)loginUser(d)},300);
+  localStorage.setItem('tpp_data_version',DATA_VERSION);
+  const demo=S.users.find(u=>u.nick==='Mexicano');
+  if(demo)loginUser(demo);
+  else toast('Erro! Recarregue a página.','error');
 }
 
 function doRegister(){
@@ -1135,14 +1166,45 @@ function loginUser(user){
   S.current=user;
   document.getElementById('auth-screen').style.display='none';
   document.getElementById('app').style.display='block';
-  updateSidebar();goTo('dashboard');
+  updateSidebar();
+  // Check if first access — needs password change
+  if(user.firstAccess!==false){
+    goTo('dashboard');
+    setTimeout(()=>openFirstAccessModal(),600);
+  } else {
+    goTo('dashboard');
+  }
+}
+
+function openFirstAccessModal(){
+  openModal('modal-first-access');
+}
+
+function saveFirstAccessPassword(){
+  const p1=document.getElementById('fa-pass1').value;
+  const p2=document.getElementById('fa-pass2').value;
+  if(!p1||p1.length<4){toast('Senha com pelo menos 4 caracteres!','error');return}
+  if(p1!==p2){toast('As senhas não coincidem! Nem isso... 😄','error');return}
+  const users=S.users;
+  const u=users.find(x=>x.id===S.current.id);
+  if(u){u.pass=p1;u.firstAccess=false;S.users=users;S.current=u;}
+  closeModal('modal-first-access');
+  toast('Senha criada! Agora sim, pode entrar no campo! ⚽');
+}
+
+function skipFirstAccess(){
+  // Mark as done so it doesn't ask again
+  const users=S.users;
+  const u=users.find(x=>x.id===S.current.id);
+  if(u){u.firstAccess=false;S.users=users;S.current=u;}
+  closeModal('modal-first-access');
 }
 
 function doLogout(){
   S.current=null;
   document.getElementById('app').style.display='none';
   document.getElementById('auth-screen').style.display='flex';
-  document.getElementById('login-email').value='';
+  const nickEl=document.getElementById('login-nick');if(nickEl)nickEl.value='';
   document.getElementById('login-pass').value='';
   toast('Até a próxima, craque! ✌️','info');
 }
@@ -1745,29 +1807,35 @@ function fmtDate(d){
 // ─────────────────────────────────────────
 function seedDemoData(){
   const users=[
-    {id:'u01',name:'Henrique Flores',nick:'Madrinho',email:'fsantoshenriquehsf@gmail.com',pass:'123456',pos:'ZAG',foot:'Direito',birth:'',fitness:3,created:Date.now()-9e6},
-    {id:'u02',name:'Jessé',nick:'Jessé',email:'jesseafs1@gmail.com',pass:'123456',pos:'GOL',foot:'Direito',birth:'',fitness:3,created:Date.now()-9e6},
-    {id:'u03',name:'Raul Severo',nick:'Raul',email:'rjungsevero@gmail.com',pass:'123456',pos:'MEI',foot:'Direito',birth:'',fitness:3,created:Date.now()-8e6},
-    {id:'u04',name:'Cassio',nick:'Cassio',email:'cassiobusiness.91@gmail.com',pass:'123456',pos:'ATA',foot:'Direito',birth:'',fitness:3,created:Date.now()-8e6},
-    {id:'u05',name:'William Müller',nick:'Mexicano',email:'wm.mexicano@gmail.com',pass:'123456',pos:'MEI',foot:'Direito',birth:'',fitness:3,created:Date.now()-8e6},
-    {id:'u06',name:'Antonio Marcos da Silva Verdum',nick:'Galo Fino',email:'galofino7@gmail.com',pass:'123456',pos:'MEI',foot:'Direito',birth:'',fitness:3,created:Date.now()-7e6},
-    {id:'u07',name:'Gregory Brum',nick:'Greg',email:'gregoryjoycelinda@gmail.com',pass:'123456',pos:'ATA',foot:'Direito',birth:'',fitness:3,created:Date.now()-7e6},
-    {id:'u08',name:'Fabiano Castilhos Lencines',nick:'Fabiano',email:'fcastilhos362@gmail.com',pass:'123456',pos:'ZAG',foot:'Direito',birth:'',fitness:3,created:Date.now()-7e6},
-    {id:'u09',name:'Jorge Wiltgen Flores',nick:'Jorginho',email:'jorgeflores.jf352@gmail.com',pass:'123456',pos:'GOL',foot:'Direito',birth:'',fitness:3,created:Date.now()-6e6},
-    {id:'u10',name:'Daniel',nick:'Dani',email:'marquesdaniel913@gmail.com',pass:'123456',pos:'MEI',foot:'Direito',birth:'',fitness:3,created:Date.now()-6e6},
-    {id:'u11',name:'Maurício',nick:'Maurício',email:'mca.direito@gmail.com',pass:'123456',pos:'MEI',foot:'Direito',birth:'',fitness:3,created:Date.now()-6e6},
-    {id:'u12',name:'Alexsander',nick:'Gringo',email:'alexmgoncalves09@gmail.com',pass:'123456',pos:'ATA',foot:'Direito',birth:'',fitness:3,created:Date.now()-5e6},
-    {id:'u13',name:'Lucas Jung',nick:'Luquinhas',email:'lucasjung024@gmail.com',pass:'123456',pos:'ATA',foot:'Direito',birth:'',fitness:3,created:Date.now()-5e6},
-    {id:'u14',name:'Everson Fagundes',nick:'Everson',email:'eversonfagundes.adv@gmail.com',pass:'123456',pos:'ZAG',foot:'Direito',birth:'',fitness:3,created:Date.now()-5e6},
-    {id:'u15',name:'Paulo Sérgio',nick:'Paulinho',email:'paulo.costa@hmv.org.br',pass:'123456',pos:'ZAG',foot:'Direito',birth:'',fitness:3,created:Date.now()-4e6},
-    {id:'u16',name:'Guilherme Minuzzo',nick:'Minuzzo',email:'gamer1949gui@gmail.com',pass:'123456',pos:'MEI',foot:'Direito',birth:'',fitness:3,created:Date.now()-4e6},
-    {id:'u17',name:'Gabriel Batista Franco',nick:'Gabi',email:'gabrielbatistaf95@gmail.com',pass:'123456',pos:'ZAG',foot:'Direito',birth:'',fitness:3,created:Date.now()-4e6},
-    {id:'u18',name:'Cristofer Mozart de Carvalho Leitão',nick:'Chupinho',email:'mozartcristofer@gmail.com',pass:'123456',pos:'ATA',foot:'Direito',birth:'',fitness:3,created:Date.now()-3e6},
-    {id:'u19',name:'Anderson Fagundes Cabreira',nick:'Nakamura',email:'andersonfagundescabreira@gmail.com',pass:'123456',pos:'ZAG',foot:'Direito',birth:'',fitness:3,created:Date.now()-3e6},
-    {id:'u20',name:'Jorge Alberto Santos Salas',nick:'Tio Jorge',email:'salasgoleiro@gmail.com',pass:'123456',pos:'GOL',foot:'Direito',birth:'',fitness:3,created:Date.now()-3e6},
-    {id:'u21',name:'Ronan Bonfim Sampaio',nick:'Ronan',email:'ronan.b.sampaio@gmail.com',pass:'123456',pos:'ZAG',foot:'Direito',birth:'',fitness:3,created:Date.now()-2e6},
-    {id:'u22',name:'Douglas Ferreira',nick:'Malandro',email:'dgls.ferreira.blv@gmail.com',pass:'123456',pos:'MEI',foot:'Direito',birth:'',fitness:3,created:Date.now()-2e6},
-    {id:'u23',name:'Jorge Flores',nick:'Jorge Pai',email:'jorgepai@fut7.com',pass:'123456',pos:'ATA',foot:'Direito',birth:'',fitness:3,created:Date.now()-1e6},
+    {id:'u01',name:'Henrique Flores',nick:'Madrinho',email:'fsantoshenriquehsf@gmail.com',pass:'madrinho',pos:'ZAG',foot:'Direito',birth:'',fitness:3,created:Date.now()-100000},
+    {id:'u03',name:'Raul Severo',nick:'Raul',email:'rjungsevero@gmail.com',pass:'raul',pos:'MEI',foot:'Direito',birth:'',fitness:3,created:Date.now()-200000},
+    {id:'u04',name:'Cassio',nick:'Cassio',email:'cassiobusiness.91@gmail.com',pass:'cassio',pos:'ATA',foot:'Direito',birth:'',fitness:3,created:Date.now()-300000},
+    {id:'u05',name:'William Müller',nick:'Mexicano',email:'wm.mexicano@gmail.com',pass:'mexicano',pos:'MEI',foot:'Direito',birth:'',fitness:3,created:Date.now()-400000},
+    {id:'u06',name:'Antonio Marcos da Silva Verdum',nick:'Galo Fino',email:'galofino7@gmail.com',pass:'galofino',pos:'MEI',foot:'Direito',birth:'',fitness:3,created:Date.now()-500000},
+    {id:'u07',name:'Gregory Brum',nick:'Greg',email:'gregoryjoycelinda@gmail.com',pass:'greg',pos:'ATA',foot:'Direito',birth:'',fitness:3,created:Date.now()-600000},
+    {id:'u08',name:'Fabiano Castilhos Lencines',nick:'Fabiano',email:'fcastilhos362@gmail.com',pass:'lencines',pos:'ZAG',foot:'Direito',birth:'',fitness:3,created:Date.now()-700000},
+    {id:'u09',name:'Jorge Wiltgen Flores',nick:'Jorginho',email:'jorgeflores.jf352@gmail.com',pass:'jorginho',pos:'GOL',foot:'Direito',birth:'',fitness:3,created:Date.now()-800000},
+    {id:'u10',name:'Daniel',nick:'Dani',email:'marquesdaniel913@gmail.com',pass:'dani',pos:'MEI',foot:'Direito',birth:'',fitness:3,created:Date.now()-900000},
+    {id:'u11',name:'Maurício Abreu',nick:'Maurício',email:'mca.direito@gmail.com',pass:'mauricio',pos:'MEI',foot:'Direito',birth:'',fitness:3,created:Date.now()-1000000},
+    {id:'u12',name:'Alexsander',nick:'Gringo',email:'alexmgoncalves09@gmail.com',pass:'gringo',pos:'ATA',foot:'Direito',birth:'',fitness:3,created:Date.now()-1100000},
+    {id:'u13',name:'Lucas Jung',nick:'Luquinhas',email:'lucasjung024@gmail.com',pass:'luquinhas',pos:'ATA',foot:'Direito',birth:'',fitness:3,created:Date.now()-1200000},
+    {id:'u14',name:'Everson Fagundes',nick:'Everson',email:'eversonfagundes.adv@gmail.com',pass:'everson',pos:'ZAG',foot:'Direito',birth:'',fitness:3,created:Date.now()-1300000},
+    {id:'u15',name:'Paulo Sérgio',nick:'Paulinho',email:'paulo.costa@hmv.org.br',pass:'paulinho',pos:'ZAG',foot:'Direito',birth:'',fitness:3,created:Date.now()-1400000},
+    {id:'u16',name:'Guilherme Minuzzo',nick:'Minuzzo',email:'gamer1949gui@gmail.com',pass:'minuzzo',pos:'MEI',foot:'Direito',birth:'',fitness:3,created:Date.now()-1500000},
+    {id:'u17',name:'Gabriel Batista Franco',nick:'Gabi',email:'gabrielbatistaf95@gmail.com',pass:'gabi',pos:'ZAG',foot:'Direito',birth:'',fitness:3,created:Date.now()-1600000},
+    {id:'u18',name:'Cristofer Mozart de Carvalho Leitão',nick:'Chupinho',email:'mozartcristofer@gmail.com',pass:'chupinho',pos:'ATA',foot:'Direito',birth:'',fitness:3,created:Date.now()-1700000},
+    {id:'u19',name:'Anderson Fagundes Cabreira',nick:'Nakamura',email:'andersonfagundescabreira@gmail.com',pass:'naka',pos:'ZAG',foot:'Direito',birth:'',fitness:3,created:Date.now()-1800000},
+    {id:'u20',name:'Jorge Alberto Santos Salas',nick:'Tio Jorge',email:'salasgoleiro@gmail.com',pass:'tiojorge',pos:'GOL',foot:'Direito',birth:'',fitness:3,created:Date.now()-1900000},
+    {id:'u21',name:'Ronan Bonfim Sampaio',nick:'Ronan',email:'ronan.b.sampaio@gmail.com',pass:'ronan',pos:'ZAG',foot:'Direito',birth:'',fitness:3,created:Date.now()-2000000},
+    {id:'u22',name:'Douglas Ferreira',nick:'Malandro',email:'dgls.ferreira.blv@gmail.com',pass:'malandro',pos:'MEI',foot:'Direito',birth:'',fitness:3,created:Date.now()-2100000},
+    {id:'u23',name:'Jorge Flores',nick:'Jorge Pai',email:'jorgepai@tocapropai.com',pass:'jorgepai',pos:'ATA',foot:'Direito',birth:'',fitness:3,created:Date.now()-2200000},
+    {id:'u24',name:'Fabiano Goleiro',nick:'Fabiano G',email:'fabiano@tocapropai.com',pass:'fabiano',pos:'GOL',foot:'Direito',birth:'',fitness:3,created:Date.now()-2300000},
+    {id:'u25',name:'Juliano Zucchi',nick:'Juliano',email:'juliano@tocapropai.com',pass:'juliano',pos:'MEI',foot:'Direito',birth:'',fitness:3,created:Date.now()-2400000},
+    {id:'u26',name:'Dyovanni Dias',nick:'Didio',email:'didio@tocapropai.com',pass:'didio',pos:'ATA',foot:'Direito',birth:'',fitness:3,created:Date.now()-2500000},
+    {id:'u27',name:'Márcio Leão',nick:'Leão',email:'leao@tocapropai.com',pass:'leao',pos:'ZAG',foot:'Direito',birth:'',fitness:3,created:Date.now()-2600000},
+    {id:'u28',name:'Maurício',nick:'Alemão',email:'alemao@tocapropai.com',pass:'alemao',pos:'VOL',foot:'Direito',birth:'',fitness:3,created:Date.now()-2700000},
+    {id:'u29',name:'Samuel',nick:'Samuel',email:'samuel@tocapropai.com',pass:'samuel',pos:'MEI',foot:'Direito',birth:'',fitness:3,created:Date.now()-2800000},
+    {id:'u30',name:'Uelton Oliveira',nick:'Uelton',email:'uelton@tocapropai.com',pass:'uelton',pos:'VOL',foot:'Direito',birth:'',fitness:3,created:Date.now()-2900000}
   ];
   const allIds=users.map(u=>u.id);
   const group={
@@ -1775,8 +1843,8 @@ function seedDemoData(){
     name:'Família Entre Amigos',
     desc:'A pelada dos amigos — toda semana uma batalha nova!',
     local:'Campo do Bairro',
-    owner:'u02',
-    admins:['u05','u03'],
+    owner:'u05',
+    admins:['u17','u11','u06'],
     players:allIds,
     avulsos:[],
     created:Date.now()-9e6
@@ -1800,7 +1868,11 @@ function seedDemoData(){
 // ─────────────────────────────────────────
 //  BOOT
 // ─────────────────────────────────────────
-if(!S.users.length)seedDemoData();
+const DATA_VERSION = '2025-v3';
+if(!S.users.length || localStorage.getItem('tpp_data_version')!==DATA_VERSION){
+  seedDemoData();
+  localStorage.setItem('tpp_data_version',DATA_VERSION);
+}
 
 setTimeout(()=>{
   const loading=document.getElementById('loading');
@@ -2187,6 +2259,21 @@ function updateSidebar(){
   if(av&&S.current)av.textContent=(S.current.nick||S.current.name)[0].toUpperCase();
 }
 
+
+// ─────────────────────────────────────────
+//  TOGGLE PASSWORD VISIBILITY
+// ─────────────────────────────────────────
+function togglePassVis(inputId, btn){
+  const inp=document.getElementById(inputId);
+  if(!inp)return;
+  if(inp.type==='password'){
+    inp.type='text';
+    btn.textContent='🙈';
+  } else {
+    inp.type='password';
+    btn.textContent='👁';
+  }
+}
 </script>
 </body>
 </html>
