@@ -602,8 +602,9 @@ select.form-control option{background:#1a1a1a;color:var(--text)}
 <div id="app">
 <!-- MOBILE HEADER -->
 <div class="mobile-header" id="mobile-header">
+  <button id="mobile-back-btn" onclick="historyBack()" style="background:none;border:none;color:var(--muted);font-size:1.3rem;cursor:pointer;padding:4px 8px 4px 0;display:none;align-items:center;line-height:1">‹</button>
   <div class="mobile-header-logo">TOCA<span style="color:#fff">PRO</span>PAI</div>
-  <div style="font-family:var(--font-cond);font-size:.75rem;color:var(--muted)" id="mobile-page-title">INÍCIO</div>
+  <div style="font-family:var(--font-cond);font-size:.75rem;color:var(--muted);flex:1;text-align:center" id="mobile-page-title">INÍCIO</div>
   <div class="mobile-avatar" id="mobile-avatar" onclick="goTo('profile')">?</div>
 </div>
 
@@ -641,7 +642,7 @@ select.form-control option{background:#1a1a1a;color:var(--text)}
     <!-- ═══════════ DASHBOARD ═══════════ -->
     <div id="page-dashboard" class="page active">
       <div class="page-header">
-        <div class="page-title">OLÁ, <span id="dash-name">ATLETA</span>!</div>
+        <div class="page-title">Olá, <span id="dash-name" style="color:var(--green);text-transform:none">Atleta</span>! ⚽</div>
         <div class="page-sub">⚡ Pronto pra brigar pelo espaço na escalação?</div>
       </div>
       <div class="grid4" style="margin-bottom:2rem">
@@ -724,7 +725,33 @@ select.form-control option{background:#1a1a1a;color:var(--text)}
               </div>
             </div>
           </div>
-          <div class="card">
+          <div class="card" style="margin-bottom:1.5rem">
+            <div class="section-title">✏️ Editar Perfil</div>
+            <div class="form-row form-row-2" style="margin-bottom:.75rem">
+              <div class="form-group" style="margin-bottom:0">
+                <label class="form-label">Apelido</label>
+                <input class="form-control" id="edit-nick" placeholder="Seu apelido">
+              </div>
+              <div class="form-group" style="margin-bottom:0">
+                <label class="form-label">Posição</label>
+                <select class="form-control" id="edit-pos">
+                  <option value="GOL">🥅 Goleiro</option><option value="ZAG">🛡️ Zagueiro</option>
+                  <option value="LAT">⚡ Lateral</option><option value="MEI">🎯 Meia</option>
+                  <option value="ATA">🔥 Atacante</option><option value="VOL">💪 Volante</option>
+                </select>
+              </div>
+            </div>
+            <div class="form-group" style="margin-bottom:.75rem">
+              <label class="form-label">Pé Preferencial</label>
+              <select class="form-control" id="edit-foot">
+                <option value="Direito">🦵 Direito</option>
+                <option value="Esquerdo">🦵 Esquerdo</option>
+                <option value="Ambidestro">🦵🦵 Ambidestro</option>
+              </select>
+            </div>
+            <button class="btn btn-primary btn-sm btn-full" onclick="saveProfileEdit()">💾 SALVAR ALTERAÇÕES</button>
+          </div>
+          <div class="card" style="margin-bottom:1.5rem">
             <div class="section-title">⭐ Nota Geral</div>
             <div style="display:flex;align-items:center;gap:1rem;margin-bottom:1rem">
               <div class="overall" id="profile-overall">?</div>
@@ -1313,6 +1340,13 @@ async function changePassword(){
 // ── NAVIGATION ─────────────────────────────────────────────────
 const PAGE_LABELS={dashboard:'INÍCIO',profile:'PERFIL',players:'JOGADORES',groups:'GRUPOS',matches:'PARTIDAS',ranking:'RANKING'};
 function goTo(page){
+  // History tracking for back navigation
+  if(pageHistory.length===0||pageHistory[pageHistory.length-1]!==page){
+    pageHistory.push(page);
+  }
+  const backBtn=document.getElementById('mobile-back-btn');
+  if(backBtn)backBtn.style.display=pageHistory.length>1?'flex':'none';
+
   document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
   document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
   document.querySelectorAll('.bn-item').forEach(b=>b.classList.remove('active'));
@@ -1320,8 +1354,11 @@ function goTo(page){
   const navMap={dashboard:0,profile:1,players:2,ranking:3,groups:4,matches:5};
   document.querySelectorAll('.nav-item')[navMap[page]]?.classList.add('active');
   document.getElementById('bn-'+page)?.classList.add('active');
-  const lbl=document.getElementById('mobile-page-title');if(lbl)lbl.textContent=PAGE_LABELS[page]||'';
-  ({dashboard:renderDashboard,profile:renderProfile,players:renderPlayers,groups:renderGroups,matches:renderMatches,ranking:renderRanking})[page]?.();
+  const lbl=document.getElementById('mobile-page-title');
+  if(lbl)lbl.textContent=PAGE_LABELS[page]||'';
+  if(window.history&&window.history.pushState)window.history.pushState({page},'','#'+page);
+  const renders={dashboard:renderDashboard,profile:()=>{renderProfile();populateProfileForm();},players:renderPlayers,groups:renderGroups,matches:renderMatches,ranking:renderRanking};
+  renders[page]?.();
 }
 
 function updateSidebar(){
@@ -1329,7 +1366,7 @@ function updateSidebar(){
   document.getElementById('sidebar-name').textContent=u.nick||u.name;
   document.getElementById('sidebar-pos').textContent=POS_NAME[u.pos]||'';
   document.getElementById('sidebar-avatar').textContent=(u.nick||u.name)[0].toUpperCase();
-  document.getElementById('dash-name').textContent=(u.nick||u.name).toUpperCase();
+  document.getElementById('dash-name').textContent=u.nick||u.name;
   const ma=document.getElementById('mobile-avatar');if(ma)ma.textContent=(u.nick||u.name)[0].toUpperCase();
 }
 
@@ -1489,6 +1526,8 @@ function renderProfile(){
     const avg=getAvgStat(u.id,key);const desc=avg?info.descs[Math.round(avg)-1]:'—';
     return `<div class="rating-row"><div style="flex:1;min-width:0"><div class="rating-name">${info.name}</div><div class="rating-desc">${desc}</div><div class="progress"><div class="progress-fill" style="width:${avg/5*100}%;background:${avg?colors[Math.round(avg)-1]:'#333'}"></div></div></div><div style="text-align:right;flex-shrink:0;margin-left:1rem"><div class="stars">${starHTML(avg,'sm')}</div><div style="font-size:.75rem;color:var(--muted);margin-top:2px">${avg||0}/5</div></div></div>`;
   }).join('');
+  // Populate edit form fields after render
+  setTimeout(populateProfileForm,50);
 }
 
 // ── PLAYERS ────────────────────────────────────────────────────
@@ -1711,6 +1750,49 @@ async function saveMatchResult(mid){
   closeModal('modal-match-result');toast(`${a}×${b} salvo! Todos podem ver 🏆`);
 }
 
+// ── AUTH UI (tabs + cadastro) ──────────────────────────────────
+function switchAuthTab(tab){
+  const tabs=document.querySelectorAll('#auth-tabs .tab');
+  tabs.forEach((t,i)=>t.classList.toggle('active',(tab==='login'&&i===0)||(tab==='register'&&i===1)));
+  const lg=document.getElementById('auth-login');const rg=document.getElementById('auth-register');
+  if(lg)lg.style.display=tab==='login'?'block':'none';
+  if(rg)rg.style.display=tab==='register'?'block':'none';
+}
+
+async function doRegister(){
+  const name=(document.getElementById('reg-name')?.value||'').trim();
+  const nick=(document.getElementById('reg-nick')?.value||'').trim();
+  const email=(document.getElementById('reg-email')?.value||'').trim();
+  const birth=document.getElementById('reg-birth')?.value||'';
+  const pos=document.getElementById('reg-pos')?.value||'';
+  const foot=document.getElementById('reg-foot')?.value||'Direito';
+  const fitness=parseInt(document.getElementById('reg-fitness')?.value)||3;
+  const pass=document.getElementById('reg-pass')?.value||'';
+  if(!name||!nick||!email||!pos||!pass){toast('Preencha todos os campos obrigatórios!','error');return;}
+  if(pass.length<4){toast('Senha precisa ter pelo menos 4 caracteres.','error');return;}
+  // recarrega lista de usuários antes de checar conflito
+  try{
+    const snap=await fs.getDocs(fs.collection(db,'users'));
+    allUsers=snap.docs.map(d=>({...d.data(),id:d.id}));
+  }catch(e){/* segue mesmo se falhar */}
+  const conflict=allUsers.find(u=>(u.nick||'').toLowerCase()===nick.toLowerCase());
+  if(conflict){toast('Esse apelido já está em uso. Escolha outro!','error');return;}
+  syncAnim(true);
+  try{
+    const id='u'+Date.now();
+    await fs.setDoc(fs.doc(db,'users',id),{name,nick,email,birth,pos,foot,fitness,pass,firstAccess:false,created:fs.serverTimestamp()});
+    syncAnim(false);
+    toast('Conta criada! 🎉 Faz login pra começar a jogar!');
+    switchAuthTab('login');
+    const ln=document.getElementById('login-nick');if(ln)ln.value=nick;
+    document.getElementById('login-pass')?.focus();
+  }catch(e){
+    syncAnim(false);
+    console.error(e);
+    toast('Erro ao criar conta. Verifique sua conexão.','error');
+  }
+}
+
 // ── RANKING ────────────────────────────────────────────────────
 function renderRanking(){
   const el=document.getElementById('ranking-list');
@@ -1732,6 +1814,51 @@ else{
   window.addEventListener('firebase-ready',initFirebase,{once:true});
   setTimeout(()=>{if(!window._firebaseReady){setLoadingStatus('⚠️ Configure as chaves Firebase no código!');document.getElementById('loading-status').style.color='var(--red)';}},4000);
 }
+
+
+// ── EDIT PROFILE ──────────────────────────────────────────────
+function populateProfileForm(){
+  const u=currentUser;if(!u)return;
+  const nickEl=document.getElementById('edit-nick');
+  const posEl=document.getElementById('edit-pos');
+  const footEl=document.getElementById('edit-foot');
+  if(nickEl)nickEl.value=u.nick||'';
+  if(posEl)posEl.value=u.pos||'MEI';
+  if(footEl)footEl.value=u.foot||'Direito';
+}
+
+async function saveProfileEdit(){
+  const nick=document.getElementById('edit-nick')?.value.trim();
+  const pos=document.getElementById('edit-pos')?.value;
+  const foot=document.getElementById('edit-foot')?.value;
+  if(!nick){toast('Apelido não pode ser vazio!','error');return;}
+  const taken=allUsers.find(u=>u.id!==currentUser.id&&u.nick.toLowerCase()===nick.toLowerCase());
+  if(taken){toast('Esse apelido já está em uso!','error');return;}
+  syncAnim(true);
+  await fs.updateDoc(fs.doc(db,'users',currentUser.id),{nick,pos,foot});
+  syncAnim(false);
+  currentUser={...currentUser,nick,pos,foot};
+  updateSidebar();
+  const dn=document.getElementById('dash-name');if(dn)dn.textContent=nick;
+  toast('Perfil atualizado! ✅');
+  renderProfile();
+}
+
+// ── HISTORY NAVIGATION ─────────────────────────────────────────
+const pageHistory=[];
+
+function historyBack(){
+  if(pageHistory.length<=1)return;
+  pageHistory.pop();
+  const prev=pageHistory[pageHistory.length-1];
+  pageHistory.pop();
+  goTo(prev);
+}
+
+// Handle Android hardware back button
+window.addEventListener('popstate',()=>{
+  if(pageHistory.length>1){historyBack();}
+});
 
 </script>
 </body>
