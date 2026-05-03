@@ -539,7 +539,7 @@ select.form-control option{background:#1a1a1a;color:var(--text)}
         </div>
       </div>
       <button class="btn btn-primary btn-full" style="margin-top:.5rem" onclick="doLogin()">⚡ ENTRAR NO CAMPO</button>
-    </div>    </div>
+    </div>
 
     <!-- REGISTER -->
     <div id="auth-register" style="display:none">
@@ -575,19 +575,13 @@ select.form-control option{background:#1a1a1a;color:var(--text)}
           </select>
         </div>
       </div>
-      <div class="form-row form-row-2">
-        <div class="form-group">
-          <label class="form-label">Pé Preferencial</label>
-          <select class="form-control" id="reg-foot">
-            <option value="Direito">🦵 Direito</option>
-            <option value="Esquerdo">🦵 Esquerdo</option>
-            <option value="Ambidestro">🦵🦵 Ambidestro</option>
-          </select>
-        </div>
-        <div class="form-group">
-          <label class="form-label">Nível Físico (1-5)</label>
-          <input class="form-control" type="number" id="reg-fitness" min="1" max="5" placeholder="3">
-        </div>
+      <div class="form-group">
+        <label class="form-label">Pé Preferencial</label>
+        <select class="form-control" id="reg-foot">
+          <option value="Direito">🦵 Direito</option>
+          <option value="Esquerdo">🦵 Esquerdo</option>
+          <option value="Ambidestro">🦵🦵 Ambidestro</option>
+        </select>
       </div>
       <div class="form-group">
         <label class="form-label">Senha</label>
@@ -1213,6 +1207,8 @@ async function initApp(){
       await seedFirestore();
     } else {
       allUsers=snap.docs.map(d=>({...d.data(),id:d.id}));
+      await ensureInitialUsers();
+      await ensureInitialGroup();
     }
     setLoadingStatus('Pronto! ✅');
     setTimeout(()=>{
@@ -1232,6 +1228,29 @@ async function seedFirestore(){
   await batch.commit();
   allUsers=[...INITIAL_USERS];
   setLoadingStatus('Dados iniciais criados ✓');
+}
+
+// Cria os usuários da lista INITIAL_USERS que ainda não existem em Firestore.
+// Não toca nos que já estão lá (preserva senhas trocadas, edições de perfil, etc).
+async function ensureInitialUsers(){
+  const existing=new Set(allUsers.map(u=>u.id));
+  const missing=INITIAL_USERS.filter(u=>!existing.has(u.id));
+  if(!missing.length)return;
+  setLoadingStatus(`Criando ${missing.length} atleta(s) inicial(is)...`);
+  const batch=fs.writeBatch(db);
+  missing.forEach(u=>batch.set(fs.doc(db,'users',u.id),{...u,created:fs.serverTimestamp()}));
+  await batch.commit();
+  allUsers=[...allUsers,...missing];
+}
+
+// Cria o grupo inicial se não existir
+async function ensureInitialGroup(){
+  try{
+    const gsnap=await fs.getDoc(fs.doc(db,'groups',INITIAL_GROUP.id));
+    if(!gsnap.exists()){
+      await fs.setDoc(fs.doc(db,'groups',INITIAL_GROUP.id),{...INITIAL_GROUP,created:fs.serverTimestamp()});
+    }
+  }catch(e){console.error('ensureInitialGroup',e);}
 }
 
 // ── LISTENERS ──────────────────────────────────────────────────
