@@ -10,6 +10,15 @@
 <meta name="apple-mobile-web-app-title" content="TocaProPai">
 <title>TocaProPai — Escalação Digital</title>
 <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Barlow:wght@400;500;600;700&family=Barlow+Condensed:wght@400;600;700&display=swap" rel="stylesheet">
+<script>
+// Aplica o tema antes do primeiro paint (evita flash de tema errado)
+(function(){
+  try{
+    var t = localStorage.getItem('tpp-theme') || 'dark';
+    if(t === 'light') document.documentElement.classList.add('theme-light');
+  } catch(e){}
+})();
+</script>
 
 <!-- ══════════════════════════════════════════════════════════════
      FIREBASE — Cole suas chaves abaixo
@@ -48,9 +57,23 @@ window.dispatchEvent(new Event('firebase-ready'));
   --black:#0A0A0A;--dark:#111;--card:#161616;--card2:#1e1e1e;
   --gray:#2a2a2a;--gray2:#333;--text:#f0f0f0;--muted:#888;
   --gold:#FFD700;--red:#FF3B3B;--blue:#4FC3F7;--orange:#FF9800;
+  --shadow-strong:rgba(0,0,0,.6);
+  --shadow-soft:rgba(0,0,0,.3);
+  --border:#222;
+  --hover-overlay:rgba(255,255,255,.04);
   --font-head:'Bebas Neue',sans-serif;
   --font:'Barlow',sans-serif;
   --font-cond:'Barlow Condensed',sans-serif;
+}
+:root.theme-light{
+  --green:#00A845;--green-dark:#007a30;--green-neon:#00C853;
+  --black:#f5f7fa;--dark:#ffffff;--card:#ffffff;--card2:#f5f7fa;
+  --gray:#e4e8ec;--gray2:#cdd3da;--text:#16202a;--muted:#5b6873;
+  --gold:#C49B00;--red:#D7263D;--blue:#0277BD;--orange:#E65100;
+  --shadow-strong:rgba(15,23,42,.18);
+  --shadow-soft:rgba(15,23,42,.08);
+  --border:#dfe5ec;
+  --hover-overlay:rgba(15,23,42,.04);
 }
 html{scroll-behavior:smooth}
 body{background:var(--black);color:var(--text);font-family:var(--font);min-height:100vh;overflow-x:hidden}
@@ -157,6 +180,13 @@ body{background:var(--black);color:var(--text);font-family:var(--font);min-heigh
   margin-left:auto;background:none;border:none;color:var(--muted);
   cursor:pointer;font-size:1rem;padding:4px;border-radius:4px;transition:color .2s;
 }
+.logout-btn:hover{color:var(--red)}
+.theme-toggle-btn{
+  background:none;border:none;color:var(--muted);
+  cursor:pointer;font-size:1.05rem;padding:4px 6px;border-radius:6px;
+  transition:color .2s,background .2s;
+}
+.theme-toggle-btn:hover{color:var(--text);background:var(--hover-overlay)}
 .logout-btn:hover{color:var(--red)}
 
 /* ─── MAIN ─── */
@@ -538,7 +568,7 @@ select.form-control option{background:#1a1a1a;color:var(--text)}
           <button type="button" onclick="togglePassVis('login-pass',this)" style="position:absolute;right:0;top:0;bottom:0;width:42px;background:none;border:none;cursor:pointer;color:var(--muted);font-size:1.1rem;display:flex;align-items:center;justify-content:center;border-radius:0 8px 8px 0;transition:color .2s" onmouseover="this.style.color='var(--text)'" onmouseout="this.style.color='var(--muted)'">👁</button>
         </div>
       </div>
-      <button class="btn btn-primary btn-full" style="margin-top:.5rem" onclick="doLogin()">⚡ ENTRAR NO CAMPO</button>
+      <button id="btn-login" class="btn btn-primary btn-full" style="margin-top:.5rem" onclick="doLogin()">⚡ ENTRAR NO CAMPO</button>
     </div>
 
     <!-- REGISTER -->
@@ -599,6 +629,7 @@ select.form-control option{background:#1a1a1a;color:var(--text)}
   <button id="mobile-back-btn" onclick="historyBack()" style="background:none;border:none;color:var(--muted);font-size:1.3rem;cursor:pointer;padding:4px 8px 4px 0;display:none;align-items:center;line-height:1">‹</button>
   <div class="mobile-header-logo">TOCA<span style="color:#fff">PRO</span>PAI</div>
   <div style="font-family:var(--font-cond);font-size:.75rem;color:var(--muted);flex:1;text-align:center" id="mobile-page-title">INÍCIO</div>
+  <button class="theme-toggle-btn" onclick="toggleTheme()" title="Alternar tema" id="theme-toggle-mobile" style="margin-right:6px">🌙</button>
   <div class="mobile-avatar" id="mobile-avatar" onclick="goTo('profile')">?</div>
 </div>
 
@@ -626,6 +657,7 @@ select.form-control option{background:#1a1a1a;color:var(--text)}
         <div class="user-name" id="sidebar-name">Usuário</div>
         <div class="user-pos" id="sidebar-pos">—</div>
       </div>
+      <button class="theme-toggle-btn" onclick="event.stopPropagation();toggleTheme()" title="Alternar tema" id="theme-toggle-sidebar">🌙</button>
       <button class="logout-btn" onclick="event.stopPropagation();doLogout()" title="Sair">↩</button>
     </div>
   </aside>
@@ -1297,15 +1329,23 @@ async function doLogin(){
   const pass=document.getElementById('login-pass').value;
   const btn=document.getElementById('btn-login');
   if(!nick||!pass){toast('Preencha apelido e senha!','error');return;}
-  btn.disabled=true;btn.textContent='Verificando...';
+  if(btn){btn.disabled=true;btn.textContent='Verificando...';}
   try{
     // always reload fresh from Firestore to get latest passwords
     const snap=await fs.getDocs(fs.collection(db,'users'));
     allUsers=snap.docs.map(d=>({...d.data(),id:d.id}));
-    const user=allUsers.find(u=>u.nick.toLowerCase()===nick&&u.pass===pass);
-    if(!user){toast('Apelido ou senha errados! Vai roubar em outro campo 😅','error');btn.disabled=false;btn.textContent='⚡ ENTRAR NO CAMPO';return;}
+    const user=allUsers.find(u=>(u.nick||'').toLowerCase()===nick&&u.pass===pass);
+    if(!user){
+      toast('Apelido ou senha errados! Vai roubar em outro campo 😅','error');
+      if(btn){btn.disabled=false;btn.textContent='⚡ ENTRAR NO CAMPO';}
+      return;
+    }
     loginUser(user);
-  }catch(e){toast('Erro de conexão. Verifique internet.','error');btn.disabled=false;btn.textContent='⚡ ENTRAR NO CAMPO';}
+  }catch(e){
+    console.error('doLogin error:',e);
+    toast('Erro de conexão. Verifique internet.','error');
+    if(btn){btn.disabled=false;btn.textContent='⚡ ENTRAR NO CAMPO';}
+  }
 }
 
 function loginUser(user){
@@ -1403,6 +1443,26 @@ function togglePassVis(id,btn){
   inp.type=inp.type==='password'?'text':'password';
   btn.textContent=inp.type==='password'?'👁':'🙈';
 }
+
+// ── TEMA (dark/light) ──────────────────────────────────────────
+function applyThemeIcon(){
+  const isLight=document.documentElement.classList.contains('theme-light');
+  const icon=isLight?'☀️':'🌙';
+  const sb=document.getElementById('theme-toggle-sidebar');if(sb)sb.textContent=icon;
+  const mb=document.getElementById('theme-toggle-mobile');if(mb)mb.textContent=icon;
+  // Atualiza meta theme-color (cor da barra do navegador no mobile)
+  const meta=document.querySelector('meta[name="theme-color"]');
+  if(meta)meta.setAttribute('content',isLight?'#ffffff':'#00C853');
+}
+function toggleTheme(){
+  const html=document.documentElement;
+  const willBeLight=!html.classList.contains('theme-light');
+  html.classList.toggle('theme-light',willBeLight);
+  try{localStorage.setItem('tpp-theme',willBeLight?'light':'dark');}catch(e){}
+  applyThemeIcon();
+}
+// Sincroniza ícone no carregamento (já que o tema foi aplicado pelo script no <head>)
+document.addEventListener('DOMContentLoaded',applyThemeIcon);
 
 // ── RATINGS ────────────────────────────────────────────────────
 function getOverall(uid){
